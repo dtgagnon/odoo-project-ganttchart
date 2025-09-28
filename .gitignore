@@ -42,3 +42,6 @@ htmlcov/
 pg.log
 psql.err
 .pgsql_socket/
+
+local_tests
+docs
