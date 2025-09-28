@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="action_project_gantt_enhanced" model="ir.actions.client">
+        <field name="name">Enhanced Project Gantt</field>
+        <field name="tag">project_gantt_enhanced.action_gantt</field>
+        <field name="context">{'default_project_id': active_id}</field>
+        <field name="binding_model_id" ref="project.model_project_project"/>
+        <field name="binding_type">action</field>
+    </record>
+
+    <record id="project_project_form_inherit_gantt" model="ir.ui.view">
+        <field name="name">project.project.form.gantt.enhanced</field>
+        <field name="model">project.project</field>
+        <field name="inherit_id" ref="project.edit_project"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet/group" position="inside">
+                <group string="Gantt Planning">
+                    <field name="gantt_enable_dependencies"/>
+                </group>
+            </xpath>
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="%(action_project_gantt_enhanced)d" type="action"
+                    class="oe_stat_button" icon="fa-calendar"
+                    string="Plan Gantt"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="project_task_form_inherit_gantt" model="ir.ui.view">
+        <field name="name">project.task.form.gantt.enhanced</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="project.view_task_form2"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet/group[1]" position="after">
+                <group string="Gantt Dependencies">
+                    <field name="dependency_blocked" readonly="1" widget="toggle_button"/>
+                    <field name="dependency_blocker_ids" readonly="1" widget="many2many_tags"/>
+                    <field name="auto_schedule"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

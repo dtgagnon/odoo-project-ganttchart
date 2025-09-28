@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="project_gantt_enhanced_templates" xml:space="preserve">
+    <t t-name="project_gantt_enhanced.Gantt">
+        <div class="o_project_gantt_enhanced" t-att-class="state.loading ? 'o-loading' : ''">
+            <div class="o_project_gantt_enhanced__toolbar">
+                <div class="o_project_gantt_enhanced__toolbar-group">
+                    <button type="button" class="btn btn-link" t-on-click="() => component.onGoToday()">
+                        <i class="fa fa-crosshairs"/>
+                        <span><t t-esc="env._t('Today')"/></span>
+                    </button>
+                    <button type="button" class="btn btn-link" t-on-click="() => component.onShiftRange(-1)">
+                        <i class="fa fa-chevron-left"/>
+                    </button>
+                    <button type="button" class="btn btn-link" t-on-click="() => component.onShiftRange(1)">
+                        <i class="fa fa-chevron-right"/>
+                    </button>
+                </div>
+                <div class="o_project_gantt_enhanced__toolbar-group">
+                    <t t-foreach="component.scaleOptions" t-as="scale" t-key="scale.key">
+                        <button type="button" class="btn" t-att-class="state.scale === scale.key ? 'btn-primary' : 'btn-light'" t-on-click="() => component.onScaleChange(scale.key)">
+                            <t t-esc="env._t(scale.label)"/>
+                        </button>
+                    </t>
+                </div>
+                <div class="o_project_gantt_enhanced__toolbar-group">
+                    <select class="form-select" t-on-change="(ev) => component.onGroupingChange(ev.target.value)">
+                        <option value="user" t-att-selected="state.grouping === 'user'">User</option>
+                        <option value="project" t-att-selected="state.grouping === 'project'">Project</option>
+                        <option value="stage" t-att-selected="state.grouping === 'stage'">Stage</option>
+                    </select>
+                </div>
+                <div class="o_project_gantt_enhanced__toolbar-group">
+                    <button type="button" class="btn btn-light" t-on-click="() => component.onCreateLink()">
+                        <i class="fa fa-link"/>
+                        <span><t t-esc="env._t('Link')"/></span>
+                    </button>
+                    <button type="button" class="btn btn-light" t-on-click="() => component.onRemoveLink()">
+                        <i class="fa fa-unlink"/>
+                        <span><t t-esc="env._t('Unlink')"/></span>
+                    </button>
+                </div>
+                <div class="o_project_gantt_enhanced__toolbar-group">
+                    <button type="button" class="btn btn-light" t-att-disabled="!component.canUndo" t-on-click="() => component.onUndo()">
+                        <i class="fa fa-undo"/>
+                    </button>
+                    <button type="button" class="btn btn-light" t-att-disabled="!component.canRedo" t-on-click="() => component.onRedo()">
+                        <i class="fa fa-redo"/>
+                    </button>
+                </div>
+            </div>
+            <div class="o_project_gantt_enhanced__body" t-on-click="() => { state.selectedTaskIds = []; }">
+                <div class="o_project_gantt_enhanced__sidebar">
+                    <div class="o_project_gantt_enhanced__sidebar-row" t-foreach="component.computedRows" t-as="row" t-key="row.key">
+                        <span class="o_project_gantt_enhanced__sidebar-label" t-esc="row.name"/>
+                    </div>
+                </div>
+                <div class="o_project_gantt_enhanced__timeline" t-ref="timeline" t-att-style="'--tick-count:' + Math.max(1, component.timelineTicks.length)">
+                    <div class="o_project_gantt_enhanced__header" t-att-style="'--tick-count:' + Math.max(1, component.timelineTicks.length)">
+                        <div class="o_project_gantt_enhanced__tick" t-foreach="timelineTicks" t-as="tick" t-key="tick.toISO()" t-att-style="'width:' + (100 / Math.max(1, component.timelineTicks.length)) + '%'">
+                            <span class="o_project_gantt_enhanced__tick-label">
+                                <t t-esc="tick.toFormat(state.scale === 'day' and 'ccc dd' or state.scale === 'week' and 'LLL dd' or 'LLL yyyy')"/>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="o_project_gantt_enhanced__grid"/>
+                    <div class="o_project_gantt_enhanced__nonworking" t-if="component.nonWorkingSegments.length">
+                        <div class="o_project_gantt_enhanced__nonworking-slot" t-foreach="component.nonWorkingSegments" t-as="slot" t-key="slot.left" t-att-style="`left:${slot.left}%;width:${slot.width}%;`"/>
+                    </div>
+                    <t t-if="state.todayPosition !== null">
+                        <div class="o_project_gantt_enhanced__today" t-att-style="`left:${state.todayPosition}%;height:${component.timelineHeight}px;`"/>
+                    </t>
+                    <div class="o_project_gantt_enhanced__rows">
+                        <t t-foreach="component.computedRows" t-as="row" t-key="row.key">
+                            <div class="o_project_gantt_enhanced__row" t-att-style="component.computeRowStyle(row)">
+                                <t t-foreach="row.tasks" t-as="task" t-key="task.id">
+                                    <t t-set="dates" t-value="component.getTaskDates(task)"/>
+                                    <div class="o_project_gantt_enhanced__bar"
+                                         t-att-class="component.isTaskSelected(task) ? 'o-selected' : ''"
+                                         t-att-style="component.computeBarStyle(dates)"
+                                         t-on-pointerdown="(ev) => component.onTimelinePointerDown(ev, task)"
+                                         t-on-click.stop="(ev) => component.onSelectTask(ev, task)"
+                                         t-on-dblclick.stop="() => component.onOpenTask(task)"
+                                         tabindex="0"
+                                         t-on-keydown="(ev) => component.onTaskKeydown(ev, task)">
+                                        <span class="o_project_gantt_enhanced__bar-label"><t t-esc="task.name"/></span>
+                                        <t t-if="task.blocked">
+                                            <span class="o_project_gantt_enhanced__badge">⛔</span>
+                                        </t>
+                                    </div>
+                                </t>
+                            </div>
+                        </t>
+                        <svg class="o_project_gantt_enhanced__links" t-att-height="component.timelineHeight" viewBox="0 0 100 {{component.timelineHeight or 1}}" preserveAspectRatio="none">
+                            <defs>
+                                <marker id="o_project_gantt_enhanced_arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
+                                    <path d="M0,0 L6,3 L0,6 z" fill="rgba(37, 60, 191, 0.8)"/>
+                                </marker>
+                            </defs>
+                            <t t-foreach="state.links" t-as="link" t-key="link.id">
+                                <t t-set="geom" t-value="component.computeLinkStyle(link)"/>
+                                <path t-if="geom" t-att-d="component.buildLinkPath(geom)" class="o_project_gantt_enhanced__link-path"/>
+                            </t>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

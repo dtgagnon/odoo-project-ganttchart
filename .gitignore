@@ -1,0 +1,44 @@
+# Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build outputs
+*.egg-info/
+.dist/
+build/
+dist/
+
+# Virtual envs
+.env/
+.venv/
+venv/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+
+# Logs / runtime artifacts
+*.log
+odoo_test.log
+pg.log
+
+# Local data
+.pgdata/
+
+# Node / packaging
+node_modules/
+
+# Coverage / pytest
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Misc
+.DS_Store
+# Temporary database sockets / dumps
+.pgdata/
+pg.log
+psql.err
+.pgsql_socket/
