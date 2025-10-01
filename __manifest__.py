@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
 {
-    "name": "Project Gantt Enhanced (Reverse Engineered)",
+    "name": "Project Gantt Enhanced",
     "summary": "Interactive Gantt planning with dependencies, buffers, and workload grouping for Project tasks.",
-    "description": """Implements a comprehensive Gantt planning experience for Odoo Project based on
-reverse-engineering of Odoo Enterprise capabilities. Includes drag & drop scheduling,
-dependency enforcement, workload grouping, buffer management, non-working time overlays,
-and undo/redo support.""",
+    "description": "Implements a comprehensive Gantt planning experience for Odoo Project. Includes drag & drop scheduling, dependency enforcement, workload grouping, buffer management, non-working time overlays, and undo/redo support.",
     "version": "18.0.2.0.0",
     "category": "Project",
     "author": "dtgagnon",
