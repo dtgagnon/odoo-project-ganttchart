@@ -31,12 +31,74 @@
         <field name="model">project.task</field>
         <field name="inherit_id" ref="project.view_task_form2"/>
         <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button type="object" name="action_view_successor_tasks"
+                    class="oe_stat_button" icon="fa-share-alt"
+                    string="Successors">
+                    <field name="successor_link_count" widget="statinfo"/>
+                </button>
+            </xpath>
             <xpath expr="//sheet/group[1]" position="after">
                 <group string="Gantt Dependencies">
                     <field name="dependency_blocked" readonly="1" widget="toggle_button"/>
                     <field name="dependency_blocker_ids" readonly="1" widget="many2many_tags"/>
                     <field name="auto_schedule"/>
+                    <field name="dependency_link_ids"
+                        context="{'default_target_task_id': active_id, 'tree_view_ref': 'project_gantt_enhanced.project_task_link_tree_editable', 'form_view_ref': 'project_gantt_enhanced.project_task_link_form_editable'}"
+                        options="{'no_create_edit': True}"
+                        view_mode="tree,form"/>
                 </group>
+                <group string="Planned Schedule">
+                    <field name="planned_date_begin" readonly="1" optional="show"/>
+                    <field name="planned_date_end" readonly="1" optional="show"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="project_task_link_tree_editable" model="ir.ui.view">
+        <field name="name">project.task.link.tree.editable</field>
+        <field name="model">project.task.link</field>
+        <field name="arch" type="xml">
+            <tree editable="bottom">
+                <field name="source_task_id" domain="[('project_id', '=', parent.project_id.id)]"/>
+                <field name="link_type"/>
+                <field name="buffer_quantity"/>
+                <field name="buffer_unit"/>
+                <field name="auto_propagate"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="project_task_link_form_editable" model="ir.ui.view">
+        <field name="name">project.task.link.form.editable</field>
+        <field name="model">project.task.link</field>
+        <field name="arch" type="xml">
+            <form string="Task Dependency" create="false">
+                <sheet>
+                    <group>
+                        <field name="source_task_id" domain="[('project_id', '=', parent.project_id.id)]"/>
+                        <field name="target_task_id" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="link_type" widget="selection"/>
+                        <field name="buffer_quantity"/>
+                        <field name="buffer_unit"/>
+                        <field name="auto_propagate"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="project_task_tree_inherit_gantt" model="ir.ui.view">
+        <field name="name">project.task.tree.gantt.enhanced</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="project.view_task_tree2"/>
+        <field name="arch" type="xml">
+            <xpath expr="//tree" position="inside">
+                <field name="planned_date_begin" optional="hide"/>
+                <field name="planned_date_end" optional="hide"/>
             </xpath>
         </field>
     </record>

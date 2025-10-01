@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 from datetime import timedelta
 
-import pytz
-
 from odoo import fields
 from odoo.exceptions import ValidationError
 from odoo.tests.common import TransactionCase
@@ -143,7 +141,7 @@ class TestProjectGantt(TransactionCase):
     def test_non_working_interval_fallback(self):
         """Non-working intervals return list even without calendars."""
         intervals = self.task_predecessor.with_context(
-            employee_timezone=pytz.UTC
+            employee_timezone="UTC"
         )._gantt_non_working_intervals(horizon_days=1)
         self.assertIsInstance(intervals, list)
 
@@ -154,6 +152,29 @@ class TestProjectGantt(TransactionCase):
         )
         self.project.resource_calendar_id = calendar
         slots = self.project.with_context(
-            employee_timezone=pytz.UTC
+            employee_timezone="UTC"
         )._get_calendar_non_working(horizon_days=2)
         self.assertIsInstance(slots, list)
+
+    def test_manual_adjust_dependents_records_buffer(self):
+        self.link.auto_propagate = False
+        successor = self.task_successor
+        new_start = successor.planned_date_begin + timedelta(days=2)
+        new_end = successor.planned_date_end + timedelta(days=2)
+        moves = [
+            {
+                "id": successor.id,
+                "link_id": self.link.id,
+                "new_start": fields.Datetime.to_string(new_start),
+                "new_end": fields.Datetime.to_string(new_end),
+            }
+        ]
+        moved = self.env["project.task"]._gantt_adjust_dependents(moves)
+        self.assertIn(successor.id, moved)
+        successor.invalidate_recordset(["planned_date_begin", "planned_date_end"])
+        self.assertEqual(
+            fields.Datetime.to_datetime(successor.planned_date_begin), new_start
+        )
+        buffer_log = self.env["project.task.buffer"].search([("link_id", "=", self.link.id)], limit=1)
+        self.assertTrue(buffer_log)
+        self.assertEqual(buffer_log.trigger, "manual")

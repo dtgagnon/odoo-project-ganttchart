@@ -50,9 +50,37 @@
             </div>
             <div class="o_project_gantt_enhanced__body" t-on-click="() => { state.selectedTaskIds = []; }">
                 <div class="o_project_gantt_enhanced__sidebar">
-                    <div class="o_project_gantt_enhanced__sidebar-row" t-foreach="component.computedRows" t-as="row" t-key="row.key">
-                        <span class="o_project_gantt_enhanced__sidebar-label" t-esc="row.name"/>
-                    </div>
+                    <t t-foreach="component.computedRows" t-as="row" t-key="row.key">
+                        <div class="o_project_gantt_enhanced__sidebar-group">
+                            <div class="o_project_gantt_enhanced__sidebar-group-label">
+                                <span><t t-esc="row.name"/></span>
+                                <button type="button" class="o_project_gantt_enhanced__sidebar-add" t-on-click.stop="() => component.openAddTaskDialog(row)">
+                                    <i class="fa fa-plus"/>
+                                </button>
+                            </div>
+                            <t t-foreach="row.tasks" t-as="task" t-key="task.id">
+                                <div class="o_project_gantt_enhanced__sidebar-task" t-att-style="component.computeSidebarTaskStyle(task)">
+                                    <t t-if="task._hasChildren">
+                                        <button type="button" class="o_project_gantt_enhanced__sidebar-toggle" t-on-click.stop="() => component.toggleTaskCollapse(task)">
+                                            <i class="fa" t-att-class="task._isCollapsed and 'fa-caret-right' or 'fa-caret-down'"/>
+                                        </button>
+                                    </t>
+                                    <t t-else="">
+                                        <span class="o_project_gantt_enhanced__sidebar-toggle-placeholder"/>
+                                    </t>
+                                    <span class="o_project_gantt_enhanced__sidebar-task-label">
+                                        <t t-esc="task.name"/>
+                                        <t t-if="task._isMilestone">
+                                            <span class="o_project_gantt_enhanced__sidebar-milestone">◆</span>
+                                        </t>
+                                    </span>
+                                    <t t-if="task.blocked">
+                                        <span class="o_project_gantt_enhanced__badge">⛔</span>
+                                    </t>
+                                </div>
+                            </t>
+                        </div>
+                    </t>
                 </div>
                 <div class="o_project_gantt_enhanced__timeline" t-ref="timeline" t-att-style="'--tick-count:' + Math.max(1, component.timelineTicks.length)">
                     <div class="o_project_gantt_enhanced__header" t-att-style="'--tick-count:' + Math.max(1, component.timelineTicks.length)">
@@ -73,18 +101,35 @@
                         <t t-foreach="component.computedRows" t-as="row" t-key="row.key">
                             <div class="o_project_gantt_enhanced__row" t-att-style="component.computeRowStyle(row)">
                                 <t t-foreach="row.tasks" t-as="task" t-key="task.id">
-                                    <t t-set="dates" t-value="component.getTaskDates(task)"/>
-                                    <div class="o_project_gantt_enhanced__bar"
-                                         t-att-class="component.isTaskSelected(task) ? 'o-selected' : ''"
-                                         t-att-style="component.computeBarStyle(dates)"
+                                    <div t-att-class="component.getTaskClasses(task)"
+                                         t-att-style="component.computeBarStyle(task)"
                                          t-on-pointerdown="(ev) => component.onTimelinePointerDown(ev, task)"
                                          t-on-click.stop="(ev) => component.onSelectTask(ev, task)"
                                          t-on-dblclick.stop="() => component.onOpenTask(task)"
+                                         t-on-pointerenter="() => component.onBarPointerEnter(task)"
+                                         t-on-pointerleave="() => component.onBarPointerLeave(task)"
                                          tabindex="0"
                                          t-on-keydown="(ev) => component.onTaskKeydown(ev, task)">
+                                        <t t-if="not task._isMilestone">
+                                            <span class="o_project_gantt_enhanced__handle o_project_gantt_enhanced__handle--start" t-on-pointerdown="(ev) => component.onResizeHandlePointerDown(ev, task, 'start')"/>
+                                            <span class="o_project_gantt_enhanced__handle o_project_gantt_enhanced__handle--end" t-on-pointerdown="(ev) => component.onResizeHandlePointerDown(ev, task, 'end')"/>
+                                            <button class="o_project_gantt_enhanced__dependency-handle o_project_gantt_enhanced__dependency-handle--out" type="button" t-on-pointerdown.stop="(ev) => component.startLinkingFrom(task)">
+                                                <i class="fa fa-link"/>
+                                            </button>
+                                        </t>
                                         <span class="o_project_gantt_enhanced__bar-label"><t t-esc="task.name"/></span>
                                         <t t-if="task.blocked">
                                             <span class="o_project_gantt_enhanced__badge">⛔</span>
+                                        </t>
+                                        <t t-if="task._outgoingLinks and task._outgoingLinks.length">
+                                            <div class="o_project_gantt_enhanced__link-tags">
+                                                <t t-foreach="task._outgoingLinks" t-as="outLink" t-key="outLink.id">
+                                                    <button type="button" class="o_project_gantt_enhanced__link-tag" t-on-click.stop="() => component._removeLinkInline(outLink.id)">
+                                                        <span><t t-esc="outLink.target_name"/></span>
+                                                        <i class="fa fa-times"/>
+                                                    </button>
+                                                </t>
+                                            </div>
                                         </t>
                                     </div>
                                 </t>
@@ -101,8 +146,89 @@
                                 <path t-if="geom" t-att-d="component.buildLinkPath(geom)" class="o_project_gantt_enhanced__link-path"/>
                             </t>
                         </svg>
+                        <t t-set="resizeTooltip" t-value="component.getResizeTooltip()"/>
+                        <div t-if="resizeTooltip" class="o_project_gantt_enhanced__resize-tooltip" t-att-style="`left:${resizeTooltip.leftPercent}%;top:${resizeTooltip.top}px;`">
+                            <span><t t-esc="resizeTooltip.label"/></span>
+                        </div>
+                        <t t-set="dependentPrompt" t-value="state.dependentPrompt"/>
+                        <div t-if="dependentPrompt" class="o_project_gantt_enhanced__dependent-prompt">
+                            <div class="o_project_gantt_enhanced__dependent-content">
+                                <div class="o_project_gantt_enhanced__dependent-header">
+                                    <strong><t t-esc="env._t('Adjust dependent tasks?')"/></strong>
+                                </div>
+                                <p>
+                                    <t t-esc="env._t('Moving')"/> «<t t-esc="dependentPrompt.sourceName"/>»
+                                    <t t-esc="env._t('may require shifting successors:')"/>
+                                </p>
+                                <ul>
+                                    <t t-foreach="dependentPrompt.dependents" t-as="dep" t-key="dep[0]">
+                                        <li><t t-esc="dep[1] or ('Task #' + dep[0])"/></li>
+                                    </t>
+                                </ul>
+                                <div class="o_project_gantt_enhanced__dependent-actions">
+                                    <button type="button" class="btn btn-sm btn-primary" t-on-click="() => component.applyDependentMove(true)">
+                                        <t t-esc="env._t('Keep gaps')"/>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-secondary" t-on-click="() => component.applyDependentMove(false)">
+                                        <t t-esc="env._t('Move only this task')"/>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-link" t-on-click="() => component.cancelDependentMove()">
+                                        <t t-esc="env._t('Cancel')"/>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </t>
+</templates>
+
+<templates id="project_gantt_enhanced_dialogs" xml:space="preserve">
+    <t t-name="project_gantt_enhanced.AddTaskDialog">
+        <div class="o_dialog_content o_project_gantt_enhanced__add-dialog">
+            <div class="o_dialog_header">
+                <h5 class="modal-title"><t t-esc="env._t('Schedule Task')"/></h5>
+            </div>
+            <div class="o_dialog_body">
+                <t t-if="state.loading">
+                    <div class="o_project_gantt_enhanced__dialog-loading">
+                        <i class="fa fa-spinner fa-spin"/>
+                        <span><t t-esc="env._t('Loading tasks...')"/></span>
+                    </div>
+                </t>
+                <t t-else="">
+                    <div class="mb-3">
+                        <label class="form-label"><t t-esc="env._t('Existing Task')"/></label>
+                        <select class="form-select" t-on-change="(ev) => component.onTaskSelect(ev)" t-att-value="state.selectedTaskId">
+                            <option value=""><t t-esc="env._t('Select unscheduled task')"/></option>
+                            <t t-foreach="state.taskOptions" t-as="opt" t-key="opt.id">
+                                <option t-att-value="opt.id"><t t-esc="opt.name"/></option>
+                            </t>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><t t-esc="env._t('Or create new task')"/></label>
+                        <input type="text" class="form-control" placeholder="New task name" t-att-value="state.newName" t-on-input="(ev) => component.onNameInput(ev)"/>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><t t-esc="env._t('Start date')"/></label>
+                        <input type="datetime-local" class="form-control" t-att-value="state.startValue" t-on-change="(ev) => component.onStartChange(ev)"/>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><t t-esc="env._t('Duration (days)')"/></label>
+                        <input type="number" min="0.1" step="0.1" class="form-control" t-att-value="state.duration" t-on-input="(ev) => component.onDurationChange(ev)"/>
+                    </div>
+                </t>
+            </div>
+            <div class="o_dialog_footer">
+                <button type="button" class="btn btn-secondary" t-on-click="() => component.onCancel()">
+                    <t t-esc="env._t('Cancel')"/>
+                </button>
+                <button type="button" class="btn btn-primary" t-att-disabled="component.confirmDisabled" t-on-click="() => component.onConfirm()">
+                    <t t-esc="env._t('Schedule')"/>
+                </button>
             </div>
         </div>
     </t>

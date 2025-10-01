@@ -22,6 +22,10 @@ class ProjectTask(models.Model):
         "source_task_id",
         string="Successors",
     )
+    successor_link_count = fields.Integer(
+        compute="_compute_successor_link_count",
+        string="Successors",
+    )
     dependency_blocker_ids = fields.Many2many(
         "project.task",
         compute="_compute_dependency_blocker_ids",
@@ -103,6 +107,79 @@ class ProjectTask(models.Model):
             record_key = task.id or task
             blockers_map[record_key] = task._gantt_dependency_blockers()
         return blockers_map
+
+    def _gantt_sync_dependency_state(self):
+        for task in self:
+            blockers = task._gantt_dependency_blockers()
+            vals = {}
+            if blockers:
+                if hasattr(task, "kanban_state") and task.kanban_state not in {"blocked", "done"}:
+                    vals["kanban_state"] = "blocked"
+            else:
+                if hasattr(task, "kanban_state") and task.kanban_state == "blocked":
+                    vals["kanban_state"] = "normal"
+            if vals:
+                task.with_context(skip_gantt_hooks=True, bypass_dependency_blocking=True).write(vals)
+            task.invalidate_recordset(
+                ["dependency_blocked", "dependency_blocker_ids", "dependency_link_ids"]
+            )
+
+    def _gantt_on_dependency_added(self, link):
+        self.ensure_one()
+        self.invalidate_recordset(
+            ["dependency_link_ids", "dependency_blocker_ids", "dependency_blocked"]
+        )
+        self._gantt_sync_dependency_state()
+
+    def _gantt_on_dependency_removed(self):
+        self.ensure_one()
+        self.invalidate_recordset(
+            ["dependency_link_ids", "dependency_blocker_ids", "dependency_blocked"]
+        )
+        self._gantt_sync_dependency_state()
+
+    @api.model
+    def _gantt_adjust_dependents(self, moves):
+        processed = []
+        BufferLog = self.env["project.task.buffer"].sudo()
+        Link = self.env["project.task.link"].sudo()
+        for move in moves:
+            task_id = move.get("id")
+            if not task_id:
+                continue
+            task = self.browse(task_id)
+            if not task.exists():
+                continue
+            task._check_access_rule("write")
+            new_start = move.get("new_start")
+            new_end = move.get("new_end")
+            if not (new_start and new_end):
+                continue
+            new_start_dt = fields.Datetime.from_string(new_start)
+            new_end_dt = fields.Datetime.from_string(new_end)
+            previous_start = task.planned_date_begin
+            previous_end = task.planned_date_end
+            task.with_context(skip_gantt_hooks=True).write(
+                {
+                    "planned_date_begin": new_start_dt,
+                    "planned_date_end": new_end_dt,
+                }
+            )
+            link_id = move.get("link_id")
+            if link_id:
+                link = Link.browse(link_id)
+                if link.exists():
+                    BufferLog.record_manual_adjust(
+                        link,
+                        previous_start,
+                        previous_end,
+                        new_start_dt,
+                        new_end_dt,
+                        comment="gantt_adjust",
+                    )
+            task._gantt_on_dependency_removed()
+            processed.append(task.id)
+        return processed
 
     def _gantt_is_completed_for_dependency(self, link=None):
         self.ensure_one()
@@ -249,6 +326,10 @@ class ProjectTask(models.Model):
         }
         self.with_context(skip_gantt_hooks=True).write(vals)
 
+    def _compute_successor_link_count(self):
+        for task in self:
+            task.successor_link_count = len(task.successor_link_ids)
+
     def action_open_gantt(self):
         self.ensure_one()
         return {
@@ -324,6 +405,23 @@ class ProjectTask(models.Model):
                 }
             )
         return non_working
+
+    def action_view_successor_tasks(self):
+        self.ensure_one()
+        successor_tasks = self.successor_link_ids.mapped("target_task_id")
+        action = {
+            "type": "ir.actions.act_window",
+            "name": _("Blocked Tasks"),
+            "res_model": "project.task",
+            "view_mode": "tree,form",
+            "domain": [("id", "in", successor_tasks.ids)],
+            "context": {
+                "default_project_id": self.project_id.id,
+            },
+        }
+        if successor_tasks:
+            action["res_id"] = successor_tasks[0].id
+        return action
 
 
 class Project(models.Model):

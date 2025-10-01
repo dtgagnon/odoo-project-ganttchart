@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import http, fields
+from odoo.exceptions import UserError
 from odoo.http import request
 
 
@@ -55,7 +56,9 @@ class ProjectGanttController(http.Controller):
                 {
                     "id": link.id,
                     "source": link.source_task_id.id,
+                    "source_name": link.source_task_id.display_name,
                     "target": link.target_task_id.id,
+                    "target_name": link.target_task_id.display_name,
                     "type": link.link_type,
                     "buffer": link.buffer_quantity,
                     "buffer_unit": link.buffer_unit,
@@ -101,26 +104,48 @@ class ProjectGanttController(http.Controller):
         link_type="fs",
         buffer_quantity=0.0,
         buffer_unit="day",
+        auto_propagate=True,
     ):
-        link_model = request.env["project.task.link"]
-        link = link_model.create(
-            {
-                "source_task_id": source_id,
-                "target_task_id": target_id,
-                "link_type": link_type,
-                "buffer_quantity": buffer_quantity,
-                "buffer_unit": buffer_unit,
-            }
-        )
+        env = request.env
+        Task = env["project.task"]
+        if source_id == target_id:
+            raise UserError("A task cannot depend on itself.")
+        source_task = Task.browse(source_id)
+        target_task = Task.browse(target_id)
+        source_task._check_access_rule("read")
+        target_task._check_access_rule("write")
+        if not target_task.project_id or source_task.project_id != target_task.project_id:
+            raise UserError("Dependencies must link tasks inside the same project.")
+        if not target_task.project_id.gantt_enable_dependencies:
+            raise UserError("Dependencies are disabled on this project.")
+        vals = {
+            "source_task_id": source_task.id,
+            "target_task_id": target_task.id,
+            "link_type": link_type,
+            "buffer_quantity": buffer_quantity,
+            "buffer_unit": buffer_unit,
+            "auto_propagate": auto_propagate,
+        }
+        link = env["project.task.link"].create(vals)
         return {
             "id": link.id,
             "source": link.source_task_id.id,
+            "source_name": link.source_task_id.display_name,
             "target": link.target_task_id.id,
+            "target_name": link.target_task_id.display_name,
+            "type": link.link_type,
+            "buffer": link.buffer_quantity,
+            "buffer_unit": link.buffer_unit,
+            "auto_propagate": link.auto_propagate,
         }
 
     @http.route("/project_gantt_enhanced/task/unlink", type="json", auth="user")
     def unlink_task(self, link_id):
         link = request.env["project.task.link"].browse(link_id)
+        if not link.exists():
+            raise UserError("Dependency link not found.")
+        link._check_access_rule("unlink")
+        target_task = link.target_task_id
         previous = {
             "id": link.id,
             "source": link.source_task_id.id,
@@ -128,9 +153,67 @@ class ProjectGanttController(http.Controller):
             "link_type": link.link_type,
             "buffer_quantity": link.buffer_quantity,
             "buffer_unit": link.buffer_unit,
+            "auto_propagate": link.auto_propagate,
         }
         link.unlink()
+        if target_task:
+            target_task.invalidate_recordset(
+                ["dependency_link_ids", "dependency_blocked", "dependency_blocker_ids"]
+            )
         return previous
+
+    @http.route("/project_gantt_enhanced/task/options", type="json", auth="user")
+    def task_options(self, project_id, grouping=None, group_key=None):
+        Task = request.env["project.task"].sudo()
+        domain = [
+            ("project_id", "=", project_id),
+            ("planned_date_begin", "=", False),
+            ("planned_date_end", "=", False),
+        ]
+        normalized_key = group_key
+        if normalized_key in ("__unassigned__", None):
+            normalized_key = False
+        if grouping == "user":
+            if normalized_key:
+                domain.append(("user_id", "=", int(normalized_key)))
+            else:
+                domain.append(("user_id", "=", False))
+        elif grouping == "stage" and normalized_key:
+            domain.append(("stage_id", "=", int(normalized_key)))
+        elif grouping == "project" and normalized_key:
+            domain.append(("project_id", "=", int(normalized_key)))
+        tasks = Task.search(domain, limit=50, order="name asc")
+        return [
+            {
+                "id": task.id,
+                "name": task.display_name,
+            }
+            for task in tasks
+        ]
+
+    @http.route("/project_gantt_enhanced/task/create", type="json", auth="user")
+    def create_task(self, project_id, name, grouping=None, group_key=None):
+        env = request.env
+        project = env["project.project"].browse(project_id)
+        project._check_access_rights("read")
+        vals = {"name": name, "project_id": project_id}
+        normalized_key = group_key
+        if normalized_key in ("__unassigned__", None):
+            normalized_key = False
+        if grouping == "user":
+            if normalized_key:
+                vals["user_id"] = int(normalized_key)
+            else:
+                vals["user_id"] = False
+        elif grouping == "stage" and normalized_key:
+            vals["stage_id"] = int(normalized_key)
+        task = env["project.task"].sudo().create(vals)
+        return {"id": task.id, "name": task.display_name}
+
+    @http.route("/project_gantt_enhanced/task/adjust_dependents", type="json", auth="user")
+    def adjust_dependents(self, moves):
+        processed = request.env["project.task"].sudo()._gantt_adjust_dependents(moves)
+        return {"moved": processed}
 
     @http.route("/project_gantt_enhanced/task/undo", type="json", auth="user")
     def undo_action(self, action):

@@ -83,3 +83,17 @@ class ProjectTaskLink(models.Model):
         if self.buffer_unit == "hour":
             return timedelta(hours=quantity)
         return timedelta(days=quantity)
+
+    @api.model
+    def create(self, vals):
+        link = super().create(vals)
+        if link.target_task_id:
+            link.target_task_id._gantt_on_dependency_added(link)
+        return link
+
+    def unlink(self):
+        targets = self.mapped("target_task_id")
+        res = super().unlink()
+        for task in targets:
+            task._gantt_on_dependency_removed()
+        return res

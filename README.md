@@ -7,26 +7,31 @@ requirements highlighted in *Reverse_Engineering_Odoo_Project_Gantt_Chart_Featur
 ## Feature Highlights
 
 - **Visual Timeline Planning** – Tasks render as resizable bars on a zoomable daily/weekly/monthly horizon.
-- **Drag-and-Drop Scheduling** – Drag a task bar to instantly reschedule the task; updates propagate to successors.
+- **Drag-and-Drop Scheduling** – Drag a task bar to instantly reschedule the task; successors can auto-shift or prompt for approval when buffers are enforced.
 - **Task Dependencies with Buffers** – Link tasks via finish-to-start relationships, including buffer delays and auto-propagation.
 - **Blocking Logic** – Tasks cannot move to an “In Progress” state while predecessors remain incomplete.
 - **Undo / Redo Stack** – Client-side undo/redo with server reconciliation for moves and link operations.
 - **Workload Grouping** – Switch grouping between assignee, project, or stage for resource balancing.
 - **Non-Working Time Awareness** – Calendar data is exposed for non-working intervals (UI overlay ready).
+- **Hierarchy & Milestones** – Expand/collapse nested tasks, with milestone tasks rendered as diamond markers.
+- **Inline Dependency Controls** – Start a dependency by dragging from a task handle and remove successors via inline chips.
+- **Quick Scheduling Dialog** – Add or schedule tasks directly from the sidebar, pre-filtered by the active grouping.
 
 ## Usage
 
 1. Enable the *Plan Gantt* stat button on a project (project form → "Plan Gantt").
-2. Drag task bars to reschedule; dependency-bound successors adjust automatically when buffers demand it.
-3. Select two tasks and click **Link** to add a dependency, or **Unlink** to remove it.
+2. Drag task bars to reschedule; when dependencies lack auto-propagation the UI offers to keep successor gaps aligned.
+3. Hover a task to expose the link handle; drag to another bar to create a dependency or click a successor chip to remove it. Toolbar **Link/Unlink** remains available for multi-selection workflows.
 4. Use the **Undo/Redo** controls to roll back or reapply recent planning changes.
-5. Keyboard users can focus a task bar (Tab/Shift+Tab) then use **Enter/Space** to toggle selection or **← / →** to nudge the schedule by one day.
+5. Keyboard users can focus a task bar (Tab/Shift+Tab) then use **Enter/Space** to toggle selection. Nudge schedules with **← / →** (±1 day), **Shift+Arrow** (±1 week), **Ctrl/Cmd+Arrow** (±1 hour), or **Alt+Arrow** (±12 hours).
+6. Click the sidebar “+” next to any grouping row to schedule an unscheduled task or create a new one with default duration.
 
 ### Visual cues
 
 - Shaded regions highlight non-working periods sourced from the project or company calendar.
 - A vertical orange line marks “today” within the current zoom window.
-- Dependency connectors draw elbow paths; hovering a bar surfaces the linked predecessors/successors.
+- Dependency connectors draw elbow paths; hovering a bar surfaces linked predecessors/successors and highlights viable link targets.
+- Milestones render as orange diamonds centred on the task start.
 
 ## Technical Notes
 
