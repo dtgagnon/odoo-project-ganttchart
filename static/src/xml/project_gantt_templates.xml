@@ -183,9 +183,6 @@
             </div>
         </div>
     </t>
-</templates>
-
-<templates id="project_gantt_enhanced_dialogs" xml:space="preserve">
     <t t-name="project_gantt_enhanced.AddTaskDialog">
         <div class="o_dialog_content o_project_gantt_enhanced__add-dialog">
             <div class="o_dialog_header">
@@ -232,4 +229,3 @@
             </div>
         </div>
     </t>
-</templates>
