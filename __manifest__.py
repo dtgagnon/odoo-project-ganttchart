@@ -17,10 +17,10 @@
     ],
     "assets": {
         "web.assets_backend": [
-            "project_gantt_enhanced/static/src/scss/project_gantt.scss",
-            "project_gantt_enhanced/static/src/js/project_gantt_controller.js",
-            "project_gantt_enhanced/static/src/js/project_gantt_undo_service.js",
-            "project_gantt_enhanced/static/src/xml/project_gantt_templates.xml",
+            "odoo_gantt/static/src/scss/project_gantt.scss",
+            "odoo_gantt/static/src/js/project_gantt_controller.js",
+            "odoo_gantt/static/src/js/project_gantt_undo_service.js",
+            "odoo_gantt/static/src/xml/project_gantt_templates.xml",
         ],
     },
     "installable": True,
